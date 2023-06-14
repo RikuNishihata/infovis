@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>D3 test</title>
+    <script type="text/javascript" src="./d3.js"></script>
+    <style type="text/css">
+        body {
+            width: 2500px;
+            height: 1500px;
+        }
+
+        table {
+            width: 3000px;
+            /*height: 1500px;*/
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            width: auto;
+            height: auto;
+            padding: 5px;
+            font: 12px;
+            background: black;
+            -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+            -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+            visibility: hidden;
+            color: white;
+        }
+
+        .selected {
+            fill: red;
+            stroke: brown;
+        }
+
+        .searchButtonArea {
+            display: flex;
+            justify-content: space-evenly;
+        }
+
+        #itemListArea {
+            overflow-x: scroll;
+            min-width: 900px;
+            width: 800px;
+            height: 150px;
+        }
+
+        #plotArea {
+            overflow-x: scroll;
+            width: 500px;
+        }
+
+        #itemAreaTable {
+            table-layout: fixed;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <td>
+                <div id="picAndDetailArea"></div>
+                <div id="subplotArea1"></div>
+                <div id="subplotArea2"></div>
+            </td>
+            <td id="plotArea"></td>
+            <td>
+                <div id="itemArea">
+
+                    <iframe id="imageArea" sandbox width="500" height="440">
+                    </iframe>
+                </div>
+            </td>
+        </tr>
+
+    </table>
+
+
+    <script type="text/javascript">
+        //jsのコードは必ず<script>と<(スラッシュ)script>の間に書くこと！
+
+        //width: キャンバスの幅。height：キャンバスの高さ。
+        var width = 900;
+        var height = 800;
+        var offset = 40;
+
+        var tooltip = d3.select("#plotArea").append("div").attr("class", "tooltip");
+
+        //高さheight, 幅widthのキャンバスを作る。
+        var svg = d3.select("#plotArea").append("svg")
+            .attr("width", width + 2 * offset)
+            .attr("height", height + 2 * offset);
+        //散布図上の点をクリックしたときサイズの近い商品を表示するウィンドウ
+        var recommendItemList = d3.select("#plotArea").append("div")
+            .attr("id", "itemListArea")
+            .append("table")
+            .attr("id", "itemAreaTable")
+            .attr("border", 1)
+            .attr("width", 500)
+            .attr("height", 100)
+            .append("tr");
+        //これはズボンの図を描画するキャンバス
+        var svg_pic = d3.select("#picAndDetailArea").append("svg")
+            .attr("width", 500)
+            .attr("height", (height + 2 * offset) / 2);
+        //これはズボンをカテゴリ別に絞り込みするためのボタン
+        var searchArea = d3.select("#picAndDetailArea").append("div")
+            .attr("class", "searchButtonArea")
+            .attr("width", 500)
+            .attr("height", 30);
+
+        var categoryList = ["指定なし", "casual", "denim", "slacks", "cropped", "no_type"]
+        var categoryText = ["指定なし", "カジュアルパンツ", "デニムパンツ", "スラックスパンツ", "クロップドパンツ", "その他"]
+        var outlineList = ["指定なし", "standard", "wide", "skinny", "saruel", "no_outline"];
+        var outlineText = ["指定なし", "スタンダード", "ワイドパンツ", "スキニー/スリムパンツ", "サルエルパンツ", "その他"]
+        var hemoutlineList = ["指定なし", "straight", "tapered", "flare", "no_hem_outline"];
+        var hemoutlineText = ["指定なし", "ストレート", "テーパード", "フレア/ブーツカット", "その他"]
+
+
+        searchArea.append("text")
+            .attr("x", 10)
+            .attr("y", 10)
+            .text("ジャンル絞り込み");
+        var searchButton1 = searchArea.append("select")
+            .attr("id", "button1");
+        searchButton1.append("option").attr("selected", true).attr("value", categoryList[0]).text(categoryList[0]);
+        for (var i = 1; i < categoryList.length; ++i) {
+            searchButton1.append("option").attr("value", categoryList[i]).text(categoryText[i]);
+        }
+        var searchButton2 = searchArea.append("select")
+            .attr("id", "button2");
+        searchButton2.append("option").attr("selected", true).attr("value", outlineList[0]).text(outlineList[0]);
+        for (var i = 1; i < outlineList.length; ++i) {
+            searchButton2.append("option").attr("value", outlineList[i]).text(outlineText[i]);
+        }
+        var searchButton3 = searchArea.append("select")
+            .attr("id", "button3");
+        searchButton3.append("option").attr("selected", true).attr("value", hemoutlineList[0]).text(hemoutlineList[0]);
+        for (var i = 1; i < hemoutlineList.length; ++i) {
+            searchButton3.append("option").attr("value", hemoutlineList[i]).text(hemoutlineText[i]);
+        }
+        /*
+        var searchButton4 = searchArea.append("button")
+            .text("絞り込み")
+            .attr("onclick", "searchExcute()");*/
+
+
+        //以下，金額についての絞り込みを行う。
+        //金額についての絞り込みは，HTMLの<input type="number">を用いて行う。
+
+        //これは金額についての絞り込みを行うためのキャンバス。
+        var priceArea = d3.select("#picAndDetailArea").append("div")
+            .attr("class", "searchButtonArea")
+            .attr("width", 500)
+            .attr("height", 30);
+
+        priceArea.append("text")
+            .attr("x", 10)
+            .attr("y", 10)
+            .text("金額絞り込み");
+
+        priceArea.append("text")
+            .attr("x", 10)
+            .attr("y", 30)
+            .text("下限");
+
+        //下限と上限をそれぞれ設定できる。下限値は0，上限値は150000，設定可能な幅は500。
+        var priceButton1 = priceArea.append("input")
+            .attr("type", "number")
+            .attr("min", "0")
+            .attr("max", "150000")
+            .attr("value", "0")
+            .attr("step", "500")
+            .attr("id", "minPrice");
+
+        priceArea.append("text")
+            .attr("x", 10)
+            .attr("y", 200)
+            .text("円～上限");
+
+        var priceButton2 = priceArea.append("input")
+            .attr("type", "number")
+            .attr("min", "0")
+            .attr("max", "150000")
+            .attr("value", "150000")
+            .attr("step", "500")
+            .attr("id", "maxPrice");
+
+        priceArea.append("text")
+            .attr("x", 10)
+            .attr("y", 340)
+            .text("円");
+        /*
+                var priceButton3 = priceArea.append("button")
+                    .text("絞り込み")
+                    .attr("onclick", "searchExcute()");*/
+
+        //以下，ウエストについての絞り込みを行う。
+        //ウエストについての絞り込みも，HTMLの<input type="number">を用いて行う。
+
+        //これはウエストについての絞り込みを行うためのキャンバス。
+        var waistArea = d3.select("#picAndDetailArea").append("div")
+            .attr("class", "searchButtonArea")
+            .attr("width", 500)
+            .attr("height", 50);
+
+        waistArea.append("text")
+            .attr("x", 10)
+            .attr("y", 10)
+            .text("ウエスト絞り込み");
+
+        waistArea.append("text")
+            .attr("x", 10)
+            .attr("y", 30)
+            .text("下限");
+
+        //下限と上限をそれぞれ設定できる。下限は0，上限は120，設定可能な幅は1。
+
+        var waistButton1 = waistArea.append("input")
+            .attr("type", "number")
+            .attr("min", "0")
+            .attr("max", "120")
+            .attr("value", "0")
+            .attr("step", "1")
+            .attr("id", "minWaist");
+
+        waistArea.append("text")
+            .attr("x", 30)
+            .attr("y", 200)
+            .text("cm～上限");
+
+
+        var waistButton2 = waistArea.append("input")
+            .attr("type", "number")
+            .attr("min", "0")
+            .attr("max", "120")
+            .attr("value", "120")
+            .attr("step", "1")
+            .attr("id", "maxWaist");
+
+        waistArea.append("text")
+            .attr("x", 30)
+            .attr("y", 340)
+            .text("cm");
+        /*
+        var waistButton3 = waistArea.append("button")
+            .text("絞り込み")
+            .attr("onclick", "searchExcute()");*/
+
+        //以下，絞り込みのリセットを行う。
+        /*
+        var resetArea = d3.select("#picAndDetailArea").append("div")
+            .attr("class", "searchButtonArea")
+            .attr("width", 500)
+            .attr("height", 50);
+
+        var resetButton = resetArea.append("button")
+            .text("リセット")
+            .attr("onclick", "resetExcute()");*/
+
+
+
+        //これはズボンの詳細を描画するキャンバス
+        var svg_detail = d3.select("#itemArea").append("svg")
+            .attr("width", 500)
+            .attr("height", (height + 2 * offset) / 2);
+        g = svg.append("g")
+            .attr("transform", "translate(" + offset + "," + offset + ")");
+
+        //横軸のところに，「すそのサイズ」と凡例をつけておく。
+        svg.append("text")
+            .attr("class", "hemLabel")
+            .attr("text-anchor", "end")
+            .attr("x", width)
+            .attr("y", height - 10)
+            .text("すそのサイズ[cm]");
+
+        //縦軸のところに，「もものサイズ」と凡例をつけておく。
+        svg.append("text")
+            .attr("class", "hipLabel")
+            .attr("text-anchor", "end")
+            .attr("y", 35)
+            .attr("transform", "rotate(-90)")
+            .text("もものサイズ[cm]");
+
+        //すそともも，それぞれに対してスケール変換を行う。スケールは線形である。
+        var hemScale = d3.scaleLinear().domain([15, 75]).range([0, width]);
+        var hipScale = d3.scaleLinear().domain([40, 90]).range([height, 0]);
+
+
+        //横軸にすそのサイズの，縦軸にもものサイズの軸を，それぞれとる。
+        var hemAxis = d3.axisBottom(hemScale).ticks(5).tickSize(-height);
+        var hipAxis = d3.axisLeft(hipScale).ticks(5).tickSize(-width);
+
+        svg.append("g")
+            .attr("class", "hemAxis")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(20," + (height + 10) + ")")
+            .call(hemAxis);
+
+        svg.append("g")
+            .attr("class", "hipAxis")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(20,10)")
+            .call(hipAxis);
+
+        //軸を見やすくする。
+        svg.selectAll("g").selectAll("text")
+            .attr("fill", "black")
+            .attr("stroke", "none");
+
+        var picture_width = svg_pic.attr("height");
+        var thigh = picture_width * 1.3 / 6;
+        var hem = picture_width / 6;
+        var points =
+            [[0, 0],
+            [picture_width / 3, 20], [picture_width * 2 / 3, 20],
+            [picture_width / 2 - thigh, picture_width / 6 + 20], [picture_width / 2 + thigh, picture_width / 6 + 20],
+            [picture_width / 2 - 5 - hem, picture_width * 2.3 / 3 + 20], [picture_width / 2 + 5 + hem, picture_width * 2.3 / 3 + 20],
+            [picture_width / 2 - 5, picture_width * 2.3 / 3 + 20], [picture_width / 2 + 5, picture_width * 2.3 / 3 + 20],
+            [picture_width / 2, picture_width * 1.3 / 6 + 20]];
+        //lineでズボンの輪郭を描く
+        addline("line1", points[1], points[2]);
+        addline("line2", points[1], points[3]);
+        addline("line3", points[2], points[4]);
+        addline("line4", points[3], points[5]);
+        addline("line5", points[4], points[6]);
+        addline("line6", points[7], points[9]);
+        addline("line7", points[8], points[9]);
+        addline("line8", points[5], points[7]);
+        addline("line9", points[6], points[8]);
+
+        addcircle("circle1", points[4], 10, "orange");
+        addcircle("circle2", points[6], 10, "orange");
+        var thighAndHemScale = d3.scaleLinear().domain([picture_width / 10, picture_width * 1.8 / 6]).range([15, 90]);
+        var thighHem_inv = d3.scaleLinear().domain([15, 90]).range([picture_width / 10, picture_width * 1.8 / 6]);
+        //赤い点をドラッグするともも周り、裾周りの長さを変更できる
+        d3.selectAll(".circle1").call(
+            d3.drag()
+                .on("drag", dragged_thigh)
+        );
+        d3.selectAll(".circle2")
+            .call(d3.drag()
+                .on("drag", dragged_hem));
+
+
+
+        //金額グラフ
+        var Pxmax = 15 * 10000;
+        var Pxmin = 0;
+        var Pymax = 200;
+        var Pymin = 0;
+        var Pwidth = width;
+        var Pheight = 200;
+        var PxScale = d3.scaleLinear().domain([Pxmin, Pxmax]).range([0, Pwidth]);
+        var PyScale = d3.scaleLinear().domain([Pymin, Pymax]).range([Pheight, 0]);
+        var Pstep = 1000;
+        var Plen = Pxmax / Pstep;
+        var Pdataset = [];
+        for (let i = 0; i < Plen; i++) {
+            Pdataset.push([i * Pstep, 0])
+        }
+
+        var Psvg = d3.select("#subplotArea1").append("svg")
+            .attr("width", Pwidth + 100)
+            .attr("height", Pheight + 200);
+        var Paxisx = d3.axisBottom(PxScale).ticks(5);
+        var Paxisy = d3.axisLeft(PyScale).ticks(5);
+        Psvg.append("g")
+            .attr("class", "PaxisX")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(50," + (20 + Pheight) + ")")
+            .call(Paxisx);
+        Psvg.append("g")
+            .attr("class", "PaxisY")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(50, 20)")
+            .call(Paxisy);
+        Psvg.selectAll("g").selectAll("text")
+            .attr("fill", "black")
+            .attr("stroke", "none");
+
+        //ウエストグラフ
+        var Wxmax = 125;
+        var Wxmin = 50;
+        var Wymax = 250;
+        var Wymin = 0;
+        var Wwidth = width;
+        var Wheight = 200;
+        var WxScale = d3.scaleLinear().domain([Wxmin, Wxmax]).range([0, Wwidth]);
+        var WyScale = d3.scaleLinear().domain([Wymin, Wymax]).range([Wheight, 0]);
+        var Wstep = 1;
+        var Wlen = (Wxmax - Wxmin) / Wstep;
+        var Wdataset = [];
+        for (let i = 0; i < Wlen; i++) {
+            Wdataset.push([i * Wstep + Wxmin, 0]);
+        }
+
+        var Wsvg = d3.select("#subplotArea2").append("svg")
+            .attr("width", Wwidth + 100)
+            .attr("height", Wheight + 200);
+        var Waxisx = d3.axisBottom(WxScale).ticks(5);
+        var Waxisy = d3.axisLeft(WyScale).ticks(5);
+        Wsvg.append("g")
+            .attr("class", "PaxisX")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(50," + (20 + Wheight) + ")")
+            .call(Waxisx);
+        Wsvg.append("g")
+            .attr("class", "PaxisY")
+            .attr("fill", "none")
+            .attr("stroke", "black")
+            .attr("transform", "translate(50, 20)")
+            .call(Waxisy);
+        Wsvg.selectAll("g").selectAll("text")
+            .attr("fill", "black")
+            .attr("stroke", "none");
+
+
+        //numberOfItems[i][j]はもも周りi/2,裾まわりj/2の商品の個数
+        //散布図上の点に色をつけるため用いる
+        var numberOfItems = new Array(400);
+        for (var i = 0; i < 400; ++i) {
+            numberOfItems[i] = new Array(400);
+            for (var j = 0; j < 400; ++j) {
+                numberOfItems[i][j] = 0;
+            }
+        }
+        //最も商品の数が多いサイズの商品数
+        var maxNumber = 0;
+
+
+        //pants_data.csvからデータを取り込んで，その内部でプロットの描画を行う。
+        d3.csv("Data/11_15_pants_data.csv").then(function (data) {
+            //それぞれのサイズの商品数を数える
+            for (var i = 0; i < data.length; ++i) {
+                //console.log(Math.floor(2 * Number(data[i].Hip)));
+                if (Math.floor(2 * Number(data[i].Hip)) > 200) {
+                    //console.log(data[i].Id);
+                }
+                numberOfItems[Math.floor(2 * Number(data[i].Hip))][Math.floor(2 * Number(data[i].Hem))] += 1;
+                if (numberOfItems[Math.floor(2 * Number(data[i].Hip))][Math.floor(2 * Number(data[i].Hem))] > maxNumber) {
+                    maxNumber = numberOfItems[Math.floor(2 * Number(data[i].Hip))][Math.floor(2 * Number(data[i].Hem))];
+                }
+            }
+            console.log(maxNumber);
+            //数が多いものは濃い青に、少ないものは水色に
+            var numberToColorScale = d3.scaleLog().domain([1, maxNumber]).range([255, 100]);
+            //各データに対して，すそのサイズ，もものサイズのデータを取り込み，円を描く。
+            //円の半径は，取り敢えず5にしておいた。また，色については，取り敢えず青にしておいた。
+            var circle = svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("class", "pantsData")
+                .attr("cx", function (d) { return hemScale(d.Hem) + 20; })
+                .attr("cy", function (d) { return hipScale(d.Hip) + 10; })
+                .attr("r", 4)
+                .attr("stroke", function (d) {
+                    var hipLocal = Math.floor(2 * Number(d.Hip));
+                    var hemLocal = Math.floor(2 * Number(d.Hem));
+                    //return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.7 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) + ")";
+                    return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                })
+                .attr("fill", function (d) {
+                    var hipLocal = Math.floor(2 * Number(d.Hip));
+                    var hemLocal = Math.floor(2 * Number(d.Hem));
+                    //return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.7 + ",0," + (255 - numberToColorScale(numberOfItems[hipLocal][hemLocal])) + ")";
+                    return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                })
+                //ツールチップを表示させる。
+                .on("mouseover", function (event, d) {
+                    tooltip
+                        .style("visibility", "visible")
+                        .html("すそのサイズ: " + d.Hem + "cm<br>もものサイズ: " + d.Hip + "cm");
+                })
+                .on("mousemove", function (event, d) {
+                    tooltip
+                        .style("top", (event.pageY - 20) + "px")
+                        .style("left", (event.pageX + 10) + "px");
+                })
+                .on("mouseout", function (event, d) {
+                    tooltip.style("visibility", "hidden");
+                })
+                //クリックすると，詳細情報が表示される。
+                .on("click", function (event, d) {
+                    //クリックがあるたびにその商品の詳細情報をいちいち追加していると，
+                    //一度商品の点をクリックした後で，他の点をクリックした際に，
+                    //2つの商品の詳細情報が重なって表示されてしまうことが起こりうる。
+                    //そのようなことが起こらないよう，かならず一回一回svgのtext項目は全消去する。
+                    svg_detail.selectAll("text").remove();
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 40)
+                        .attr("font-size", 30)
+                        .text("詳細情報")
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 80)
+                        .text("商品名： " + d.Name);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 110)
+                        .text("ブランド名：　" + d.Brand);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 140)
+                        .text("サイズ：　" + d.Size);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 170)
+                        .text("価格：　" + d.Price + "　円")
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 200)
+                        .text("色：　" + d.Color);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 230)
+                        .text("ウエストのサイズ：　" + d.Waist + " cm")
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 260)
+                        .text("すそのサイズ：　" + d.Hem + " cm")
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 290)
+                        .text("もものサイズ：　" + d.Hip + " cm")
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 320)
+                        .text("カテゴリ：　" + d.Category);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 350)
+                        .text("アウトライン：　" + d.Outline);
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 380)
+                        .text("すそのアウトライン： " + d.HemOutline);
+                    //URLの情報。埋め込みにも成功した。
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 410)
+                        .attr("xlink:href", "" + d.Url + "")
+                        .text("URL：　");
+                    //urlは別タブで開く
+                    svg_detail.append("text")
+                        .attr("x", 20)
+                        .attr("y", 440)
+                        .html("<a href=" + "\"" + d.Url + "\"" + " target=_\"blank\" rel=\"noopener noreferrer\">" + d.Url + "</a>");
+                    //商品画像を表示する
+                    d3.select("#imageArea").attr("src", d.Image);
+                    //サイズの近い商品を表示する
+                    recommendItemList.selectAll("td").remove();
+                    var hipOfItem = Number(d.Hip);
+                    var hemOfItem = Number(d.Hem);
+                    console.log("clicked");
+                    console.log(hipOfItem);
+                    console.log(hemOfItem);
+                    d3.selectAll(".pantsData")
+                        .each(function (pdata) {
+                            if ((Number(pdata.Hip) - hipOfItem) ** 2 + (Number(pdata.Hem) - hemOfItem) ** 2 < 0.1) {
+                                console.log(pdata.Name);
+                                console.log(pdata.Hip);
+                                console.log(pdata.Hem);
+                                var item = recommendItemList.append("td").attr("width", 300).attr("height", 100).append("div").attr("width", 300).attr("height", 100);
+                                item.append("text")
+                                    .attr("x", 20)
+                                    .attr("y", 80)
+                                    .text("商品名： " + pdata.Name)
+                                item.append("br");
+                                item.append("text").attr("x", 20)
+                                    .attr("y", 110)
+                                    .text("ブランド名：　" + pdata.Brand);
+                                item.append("br");
+                                item.append("text")
+                                    .attr("x", 20)
+                                    .attr("y", 140)
+                                    .text("サイズ：　" + pdata.Size);
+                                item.append("br");
+                                item.append("text")
+                                    .attr("x", 20)
+                                    .attr("y", 170)
+                                    .text("価格：　" + pdata.Price + "　円")
+                                item.append("br");
+                                item.append("text")
+                                    .attr("x", 20)
+                                    .attr("y", 200)
+                                    .attr("fill", "blue")
+                                    .text("クリックして詳細を見る")
+                                    .on("click", function () {
+                                        d3.select("#imageArea").attr("src", pdata.Image);
+                                        svg_detail.selectAll("text").remove();
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 40)
+                                            .attr("font-size", 30)
+                                            .text("詳細情報")
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 80)
+                                            .text("商品名： " + pdata.Name);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 110)
+                                            .text("ブランド名：　" + pdata.Brand);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 140)
+                                            .text("サイズ：　" + pdata.Size);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 170)
+                                            .text("価格：　" + pdata.Price + "　円")
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 200)
+                                            .text("色：　" + pdata.Color);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 230)
+                                            .text("ウエストのサイズ：　" + pdata.Waist + " cm")
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 260)
+                                            .text("すそのサイズ：　" + pdata.Hem + " cm")
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 290)
+                                            .text("もものサイズ：　" + pdata.Hip + " cm")
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 320)
+                                            .text("カテゴリ：　" + pdata.Category);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 350)
+                                            .text("アウトライン：　" + pdata.Outline);
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 380)
+                                            .text("すそのアウトライン： " + pdata.HemOutline);
+                                        //URLの情報。埋め込みにも成功した。
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 410)
+                                            .attr("xlink:href", "" + pdata.Url + "")
+                                            .text("URL：　");
+                                        //urlは別タブで開く
+                                        svg_detail.append("text")
+                                            .attr("x", 20)
+                                            .attr("y", 440)
+                                            .html("<a href=" + "\"" + pdata.Url + "\"" + " target=_\"blank\" rel=\"noopener noreferrer\">" + pdata.Url + "</a>");
+                                    })
+                            }
+                        });
+                    //ズボンの図を変更する
+                    thigh = thighHem_inv(d.Hip);
+                    hem = thighHem_inv(d.Hem);
+                    hip_plot = hipScale(d.Hip);
+                    hem_plot = hemScale(d.Hem);
+                    d3.select("#line2")
+                        .attr("x2", picture_width / 2 - thigh)
+                    d3.select("#line3")
+                        .attr("x2", picture_width / 2 + thigh)
+                    d3.selectAll(".circle1")
+                        .attr("cx", picture_width / 2 + thigh);
+                    d3.select("#line4")
+                        .attr("x1", picture_width / 2 - thigh)
+                        .attr("x2", picture_width / 2 - hem);
+                    d3.select("#line5")
+                        .attr("x1", picture_width / 2 + thigh)
+                        .attr("x2", picture_width / 2 + hem);
+                    d3.select("#line8")
+                        .attr("x1", picture_width / 2 - hem);
+                    d3.select("#line9")
+                        .attr("x1", picture_width / 2 + hem);
+                    d3.selectAll(".circle2")
+                        .attr("cx", picture_width / 2 + hem);
+                    d3.select("#selfCircle")
+                        .attr("cx", hem_plot + 20)
+                        .attr("cy", hip_plot + 10);
+                });
+
+            /*
+            //brush機能。ドラッグしたままカーソルを動かすと，その指定した範囲が灰色に色付けされる。
+            var brush = d3.brush()
+                .extent([
+                    [0, 0],
+                    [width - offset - offset, height - offset - offset]
+                ])
+                .on("start brush", brushed);
+    
+            g.append("g")
+                .call(brush)
+                .call(brush.move, [
+                    [hemScale(2), hipScale(0.8)],
+                    [hemScale(5), hipScale(0.3)]
+                ]);
+    
+            function brushed(event, d) {
+                var x0 = hemScale.invert(event.selection[0][0]);
+                var y1 = hipScale.invert(event.selection[0][1]);
+                var x1 = hemScale.invert(event.selection[1][0]);
+                var y0 = hipScale.invert(event.selection[1][1]);
+                circle.classed("selected", function (d) {
+                    return (x0 <= d[0] && d[0] <= x1) && (y0 <= d[1] && d[1] <= y1);
+                });
+            }*/
+
+            //ズボンの図を操作することで移動する点
+            var hem_plot = hemScale(thighAndHemScale(hem));
+            var hip_plot = hipScale(thighAndHemScale(thigh));
+            var hemScale_inv = d3.scaleLinear().domain([0, width]).range([15, 75]);
+            var hipScale_inv = d3.scaleLinear().domain([height, 0]).range([40, 90]);
+            svg.append("circle")
+                .attr("stroke", "black")
+                .attr("fill", "orange")
+                .attr("id", "selfCircle")
+                .attr("cx", hem_plot + 20)
+                .attr("cy", hip_plot + 10)
+                .attr("r", 7)
+                .call(d3.drag()
+                    .on("drag", function (event) {
+                        //水平方向の移動
+                        hem_plot += event.dx;
+                        if (hem_plot > width) {
+                            hem_plot = width;
+                        }
+                        if (hem_plot < 0) {
+                            hem_plot = 0;
+                        }
+                        hem = thighHem_inv(hemScale_inv(hem_plot));
+                        points[5][0] = picture_width / 2 - 5 - hem;
+                        points[6][0] = picture_width / 2 + 5 + hem;
+                        d3.select("#line4")
+                            .attr("x2", points[5][0]);
+                        d3.select("#line5")
+                            .attr("x2", points[6][0]);
+                        d3.select("#line8")
+                            .attr("x1", points[5][0]);
+                        d3.select("#line9")
+                            .attr("x1", points[6][0])
+                        d3.selectAll(".circle2")
+                            .attr("cx", points[6][0]);
+                        //散布図上の点をうごかす
+                        d3.select("#selfCircle")
+                            .attr("cx", hem_plot + 20);
+                        //垂直方向の移動
+                        hip_plot += event.dy;
+                        if (hip_plot > height) {
+                            hip_plot = height;
+                        }
+                        if (hip_plot < 0) {
+                            hip_plot = 0;
+                        }
+                        thigh = thighHem_inv(hipScale_inv(hip_plot));
+                        var point3 = [picture_width / 2 - thigh, 60];
+                        var point4 = [picture_width / 2 + thigh, 60];
+                        d3.select("#line2")
+                            .attr("x2", point3[0])
+                        d3.select("#line3")
+                            .attr("x2", point4[0])
+                        d3.selectAll(".circle1")
+                            .attr("cx", point4[0]);
+                        d3.select("#line4")
+                            .attr("x1", point3[0]);
+                        d3.select("#line5")
+                            .attr("x1", point4[0]);
+                        //散布図上の点をうごかす
+                        d3.select("#selfCircle")
+                            .attr("cy", hip_plot + 10);
+                    }));
+
+
+            // 金額グラフ
+
+            d3.selectAll(".pantsData").each(function (d) {
+                if (this.attributes.fill != "rgb(220,220,220)") {
+                    Pdataset[Math.floor(d.Price / Pstep)][1] += 1;
+                }
+            });
+            Psvg.append("path")
+                .datum(Pdataset)
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.)
+                .attr("d", d3.line()
+                    .x(function (d) { return 50 + PxScale(d[0]); })
+                    .y(function (d) { return 20 + PyScale(d[1]); })
+                );
+
+            function updataPrice() {
+                PdatasetTmp = [];
+                for (let i = 0; i < Plen; i++) {
+                    PdatasetTmp.push([i * Pstep, 0])
+                }
+                d3.selectAll(".pantsData").each(function (d) {
+                    if (this.attributes.fill != "rgb(220,220,220)") {
+                        PdatasetTmp[Math.floor(d.Price / Pstep)][1] += 1;
+                    }
+                });
+                Psvg.selectAll("path")
+                    .attr("d", d3.line()
+                        .x(function (d, i) { return 50 + PxScale(PdatasetTmp[i][0]); })
+                        .y(function (d, i) { return 20 + PyScale(PdatasetTmp[i][1]); })
+                    );
+            }
+
+            // 金額グラフのbrush機能
+            var Pbrushes = Psvg.append("g").attr("class", "Pbrushes");
+            var Pbrush = d3.brushX()
+                .extent([[50, 20], [50 + Pwidth, 20 + Pheight]])
+                .on("start brush", Pbrushed);
+            Pbrushes.append("g").call(Pbrush);
+            function Pbrushed(event) {
+                var x0 = PxScale.invert(event.selection[0] - 50);
+                var x1 = PxScale.invert(event.selection[1] - 50);
+                if (x1 - x0 < 300) {
+                    x0 = 0;
+                    x1 = 15 * 10000;
+                }
+                priceButton1.attr("value", Math.floor(x0));
+                priceButton2.attr("value", Math.floor(x1));
+                searchExcute();
+            };
+
+
+            // ウエストグラフ
+            d3.selectAll(".pantsData").each(function (d) {
+                if (this.attributes.fill != "rgb(220,220,220)") {
+                    if (d.Waist > Wxmin && d.Waist < Wxmax) {
+                        Wdataset[Math.floor((d.Waist - Wxmin) / Wstep)][1] += 1;
+                    }
+                }
+            });
+            Wsvg.append("path")
+                .datum(Wdataset)
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()
+                    .x(function (d) { return 50 + WxScale(d[0]); })
+                    .y(function (d) { return 20 + WyScale(d[1]); })
+                );
+            function updataWaist() {
+                WdatasetTmp = [];
+                for (let i = 0; i < Wlen; i++) {
+                    WdatasetTmp.push([i * Wstep, 0])
+                }
+                d3.selectAll(".pantsData").each(function (d) {
+                    if (this.attributes.fill != "rgb(220,220,220)") {
+                        WdatasetTmp[Math.floor(d.Wrice / Wstep)][1] += 1;
+                    }
+                });
+                Wsvg.selectAll("path")
+                    .attr("d", d3.line()
+                        .x(function (d, i) { return 50 + WxScale(WdatasetTmp[i][0]); })
+                        .y(function (d, i) { return 20 + WyScale(WdatasetTmp[i][1]); })
+                    );
+            }
+
+            // ウエストグラフのbrush機能
+            var Wbrushes = Wsvg.append("g").attr("class", "Wbrushes");
+            var Wbrush = d3.brushX()
+                .extent([[50, 20], [50 + Wwidth, 20 + Wheight]])
+                .on("start brush", Wbrushed);
+            Wbrushes.append("g").call(Wbrush);
+            function Wbrushed(event) {
+                var x2 = WxScale.invert(event.selection[0] - 50);
+                var x3 = WxScale.invert(event.selection[1] - 50);
+                if (x3 - x2 < 1) {
+                    x2 = Wxmin;
+                    x3 = Wxmax;
+                }
+                waistButton1.attr("value", Math.floor(x2));
+                waistButton2.attr("value", Math.floor(x3));
+                searchExcute();
+            };
+
+            //絞り込みとリセットボタン
+            var resetArea = d3.select("#picAndDetailArea").append("div")
+                .attr("class", "searchButtonArea")
+                .attr("width", 500)
+                .attr("height", 50);
+
+            var searchExcuteButton = resetArea.append("button")
+                .attr("id", "searchbutton")
+                .text("絞り込み");
+            //.attr("onclick", "searchExcute()");
+            document.getElementById("searchbutton").onclick = function () {
+                var c = document.getElementById("button1").value;
+                var o = document.getElementById("button2").value;
+                var h = document.getElementById("button3").value;
+                var minPrice = document.getElementById("minPrice").value - 0;
+                var maxPrice = document.getElementById("maxPrice").value - 0;
+                var minWaist = document.getElementById("minWaist").value - 0;
+                var maxWaist = document.getElementById("maxWaist").value - 0;
+                console.log(c);
+                console.log(o)
+                console.log(h);
+                console.log(minPrice);
+                console.log(maxPrice);
+                console.log(minWaist);
+                console.log(maxWaist);
+                d3.selectAll(".pantsData")
+                    .attr("fill", function (d) {
+                        if (d.Category == c || c == "指定なし") {
+                            if (d.Outline == o || o == "指定なし") {
+                                if (d.HemOutline == h || h == "指定なし") {
+                                    if (minPrice <= d.Price && d.Price <= maxPrice) {
+                                        if (minWaist <= d.Waist && d.Waist <= maxWaist) {
+                                            var hipLocal = Math.floor(2 * Number(d.Hip));
+                                            var hemLocal = Math.floor(2 * Number(d.Hem));
+                                            return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return "rgb(220,220,220)";
+                    })
+                    .attr("stroke", function (d) {
+                        if (d.Category == c || c == "指定なし") {
+                            if (d.Outline == o || o == "指定なし") {
+                                if (d.HemOutline == h || h == "指定なし") {
+                                    if (minPrice <= d.Price && d.Price <= maxPrice) {
+                                        if (minWaist <= d.Waist && d.Waist <= maxWaist) {
+                                            var hipLocal = Math.floor(2 * Number(d.Hip));
+                                            var hemLocal = Math.floor(2 * Number(d.Hem));
+                                            return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return "rgb(220,220,220)";
+                    });
+            }
+
+            var resetButton = resetArea.append("button")
+                .attr("id", "resetbutton")
+                .text("リセット");
+            //.attr("onclick", "resetExcute()");
+            document.getElementById("resetbutton").onclick = function () {
+                d3.selectAll(".pantsData")
+                    .attr("stroke", function (d) {
+                        var hipLocal = Math.floor(2 * Number(d.Hip));
+                        var hemLocal = Math.floor(2 * Number(d.Hem));
+                        return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                    })
+                    .attr("fill", function (d) {
+                        var hipLocal = Math.floor(2 * Number(d.Hip));
+                        var hemLocal = Math.floor(2 * Number(d.Hem));
+                        return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                    })
+                document.getElementById("button1").value = "指定なし";
+                document.getElementById("button2").value = "指定なし";
+                document.getElementById("button3").value = "指定なし";
+                priceButton1.attr("value", 0);
+                priceButton2.attr("value", 150000);
+                waistButton1.attr("value", 0);
+                waistButton2.attr("value", 120);
+            }
+
+            function searchExcute() {
+                var c = document.getElementById("button1").value;
+                var o = document.getElementById("button2").value;
+                var h = document.getElementById("button3").value;
+                var minPrice = document.getElementById("minPrice").value - 0;
+                var maxPrice = document.getElementById("maxPrice").value - 0;
+                var minWaist = document.getElementById("minWaist").value - 0;
+                var maxWaist = document.getElementById("maxWaist").value - 0;
+                /*
+                console.log(c);
+                console.log(o)
+                console.log(h);
+                console.log(minPrice);
+                console.log(maxPrice);
+                console.log(minWaist);
+                console.log(maxWaist);*/
+                d3.selectAll(".pantsData")
+                    .attr("fill", function (d) {
+                        if (d.Category == c || c == "指定なし") {
+                            if (d.Outline == o || o == "指定なし") {
+                                if (d.HemOutline == h || h == "指定なし") {
+                                    if (minPrice <= d.Price && d.Price <= maxPrice) {
+                                        if (minWaist <= d.Waist && d.Waist <= maxWaist) {
+                                            var hipLocal = Math.floor(2 * Number(d.Hip));
+                                            var hemLocal = Math.floor(2 * Number(d.Hem));
+                                            return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return "rgb(220,220,220)";
+                    })
+                    .attr("stroke", function (d) {
+                        if (d.Category == c || c == "指定なし") {
+                            if (d.Outline == o || o == "指定なし") {
+                                if (d.HemOutline == h || h == "指定なし") {
+                                    if (minPrice <= d.Price && d.Price <= maxPrice) {
+                                        if (minWaist <= d.Waist && d.Waist <= maxWaist) {
+                                            var hipLocal = Math.floor(2 * Number(d.Hip));
+                                            var hemLocal = Math.floor(2 * Number(d.Hem));
+                                            return "rgb(" + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.6 + "," + numberToColorScale(numberOfItems[hipLocal][hemLocal]) * 0.8 + ",255)";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return "rgb(220,220,220)";
+                    });
+            }
+
+        });
+
+
+        function addline(id, pointA, pointB) {
+            svg_pic.append("line")
+                .attr("id", id)
+                .attr("x1", pointA[0])
+                .attr("y1", pointA[1])
+                .attr("x2", pointB[0])
+                .attr("y2", pointB[1])
+                .attr("stroke-width", 5)
+                .attr("stroke", "black");
+        }
+        function addcircle(id, point, radius, color) {
+            var circle_group = svg_pic.append("g")
+                .attr("id", id);
+            circle_group.append("circle")
+                .attr("class", id)
+                .attr("cx", point[0])
+                .attr("cy", point[1])
+                .attr("fill", color)
+                .attr("r", radius);
+            circle_group.append("circle")
+                .attr("class", id)
+                .attr("cx", point[0])
+                .attr("cy", point[1])
+                .attr("fill", "rgb(255,255,255)")
+                .attr("r", radius / 2);
+        }
+        function dragged_thigh(event) {
+            thigh += event.dx;
+            if (thighAndHemScale(thigh) < 40) {
+                thigh = thighHem_inv(40);
+            }
+            if (thighAndHemScale(thigh) > 90) {
+                thigh = thighHem_inv(90);
+            }
+            var point3 = [picture_width / 2 - thigh, 60];
+            var point4 = [picture_width / 2 + thigh, 60];
+            d3.select("#line2")
+                .attr("x2", point3[0])
+            d3.select("#line3")
+                .attr("x2", point4[0])
+            d3.selectAll(".circle1")
+                .attr("cx", point4[0]);
+            d3.select("#line4")
+                .attr("x1", point3[0]);
+            d3.select("#line5")
+                .attr("x1", point4[0]);
+            //散布図上の点をうごかす
+            d3.select("#selfCircle")
+                .attr("cy", hipScale(thighAndHemScale(thigh)) + 10);
+        }
+        function dragged_hem(event) {
+            hem += event.dx;
+            if (thighAndHemScale(hem) < 15) {
+                hem = thighHem_inv(15);
+            }
+            if (thighAndHemScale(hem) > 75) {
+                hem = thighHem_inv(75);
+            }
+            points[5][0] = picture_width / 2 - 5 - hem;
+            points[6][0] = picture_width / 2 + 5 + hem;
+            d3.select("#line4")
+                .attr("x2", points[5][0]);
+            d3.select("#line5")
+                .attr("x2", points[6][0]);
+            d3.select("#line8")
+                .attr("x1", points[5][0]);
+            d3.select("#line9")
+                .attr("x1", points[6][0])
+            d3.selectAll(".circle2")
+                .attr("cx", points[6][0]);
+            //散布図上の点をうごかす
+            d3.select("#selfCircle")
+                .attr("cx", hemScale(thighAndHemScale(hem)) + 20);
+        }
+
+
+
+
+
+
+
+
+    </script>
+</body>
+
+</html>
